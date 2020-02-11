@@ -13,6 +13,7 @@ import openpyxl
 from openpyxl.styles import PatternFill, Font, Border, Side
 from openpyxl.styles.colors import WHITE
 import datetime
+import os
 
 # If modifying these scopes, delete the file token.pickle.
 SCOPES = ['https://www.googleapis.com/auth/drive']
@@ -42,12 +43,17 @@ def main():
 
     service = build('drive', 'v3', credentials=creds)
 
-    # Call the Drive v3 API
-    results = service.files().list(q="'1bBWxuYTZbMg5UFK8La5-cUrcScKM2lre' in parents",
-        pageSize=1000, fields="nextPageToken, files(id, name)").execute()
+    # MEVAMACOL
+#    results = service.files().list(q="'1bBWxuYTZbMg5UFK8La5-cUrcScKM2lre' in parents",
+#        pageSize=1000, fields="nextPageToken, files(id, name)").execute()
+#    M&G
 #    results = service.files().list(q="'1MQO1Z0i-txOmbteB-VNyw9C4xs2xON5m' in parents",
 #        pageSize=1000, fields="nextPageToken, files(id, name)").execute()
+#    Green Monkey
+    results = service.files().list(q="'1XsjAv-Tqx_B6xIHKai8_yVmcwKla6yCl' in parents",
+        pageSize=1000, fields="nextPageToken, files(id, name)").execute()
 
+    token = results.get('nextPageToken')
     items = results.get('files', [])
 
     # Crear Diccionario Facturas fileId : Name
@@ -64,7 +70,7 @@ def main():
 def download_file(service, factura_dic):
     for file_id, name in factura_dic.items():
         request = service.files().get_media(fileId=file_id)
-        fh = io.FileIO("/Users/mpatinob/Dropbox/Personal/Negocios/Lili Pink/Facturas_Electronica/" + name, 'wb')
+        fh = io.FileIO("/Users/mpatinob/Dropbox/Personal/Negocios/Lili Pink/Facturas_Electronica/Facturas_download/" + name, 'wb')
         downloader = MediaIoBaseDownload(fh, request)
         done = False
         while done is False:
@@ -72,25 +78,26 @@ def download_file(service, factura_dic):
             print ("Download %d%%." % int(status.progress() * 100))
 
 def Parse_facturas():
+    dic_nombre_facturas = {}
     fact_proc = []
-    path = '/Users/mpatinob/Dropbox/Personal/Negocios/Lili Pink/Facturas_Electronica'
+    path = '/Users/mpatinob/Dropbox/Personal/Negocios/Lili Pink/Facturas_Electronica/Facturas_download'
     files = [f for f in listdir(path) if isfile(join(path, f))]
     for f in files:
         subtotal = 0
         descuento = 0
         if '.xml' in f:
             print (f)
-            factura =  open('/Users/mpatinob/Dropbox/Personal/Negocios/Lili Pink/Facturas_Electronica/' + str(f))
+            factura =  open('/Users/mpatinob/Dropbox/Personal/Negocios/Lili Pink/Facturas_Electronica/Facturas_download/' + str(f))
             factura_parse = factura.read()
             Factura_id = re.findall(r"<cbc:ParentDocumentID>(\w+)<\/cbc:ParentDocumentID>", factura_parse)
             if len(Factura_id) == 0:
-                Factura_id = ["N/A"]
-            Tienda = re.findall(r"<cbc:CityName>(\w+|\w+ \w+)<\/cbc:CityName>", factura_parse)
+                Factura_id = ["N_A"]
+            Tienda = re.findall(r"<cbc:CityName>(\w+|\w+ \w+|\w+ \w+ \w+|JAMUND.)<\/cbc:CityName>", factura_parse)
             if len(Tienda) == 0:
-                Tienda = ["N/A"]
+                Tienda = ["N_A"]
             Issue_Date = re.findall(r"<cbc:IssueDate>(\d+-\d+-\d+)<\/cbc:IssueDate>", factura_parse)
             if len(Issue_Date) == 0:
-                Issue_Date = ["N/A", "N/A"]
+                Issue_Date = ["N_A", "N_A"]
             Credito = re.findall(r"<cbc:Description>(CREDITOS LILI PINK)</cbc:Description>", factura_parse)
             if len(Credito) == 0:
                 Credito.append('CONTADO')
@@ -104,10 +111,20 @@ def Parse_facturas():
                 interes = re.findall(r'<cbc:PriceAmount currencyID="COP">(\d+\.\d+)<\/cbc:PriceAmount>', factura_parse)
             else:
                 interes = ['0' , '0']
+            dic_nombre_facturas.update({Factura_id[0] : [Tienda[0], Credito[0], IssueDate[1]]})
             subtotal = round((float(Valor_total[0]) - float(iva[0]))/0.63 , 2)
             descuento = round(subtotal * 0.37 , 2)
             fact_proc.append([Factura_id[0],Tienda[0],Issue_Date[1], str(subtotal), str(descuento), iva[0], Valor_total[0], interes[1], Credito[0]])
-    return fact_proc
+    return fact_proc, dic_nombre_facturas
+
+def rename_files(dic_nombre_facturas):
+    path = '/Users/mpatinob/Dropbox/Personal/Negocios/Lili Pink/Facturas_Electronica/Facturas_download'
+    files = [f for f in listdir(path) if isfile(join(path, f))]
+    for k,v in dic_nombre_facturas.items():
+        for f in files:
+            if str(k) in f:
+                os.rename(path + "/" + f , path + "/" + str(dic_nombre_facturas[k][2]) + "_" + str(dic_nombre_facturas[k][0]) + "_" + str(dic_nombre_facturas[k][1]) + "_" + f)
+
 
 def Reporte(fact_proc):
     excel_salida = openpyxl.Workbook()
@@ -172,5 +189,6 @@ def Reporte(fact_proc):
 if __name__ == '__main__':
     service, factura_dic = main()
     download_file(service, factura_dic)
-    fact_proc = Parse_facturas()
+    fact_proc, dic_nombre_facturas = Parse_facturas()
+    rename_files(dic_nombre_facturas)
     Reporte(fact_proc)
