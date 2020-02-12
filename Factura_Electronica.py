@@ -43,19 +43,25 @@ def main():
 
     service = build('drive', 'v3', credentials=creds)
 
+    token = None
+    items = []
     # MEVAMACOL
-#    results = service.files().list(q="'1bBWxuYTZbMg5UFK8La5-cUrcScKM2lre' in parents",
-#        pageSize=1000, fields="nextPageToken, files(id, name)").execute()
+    while True:
+        results = service.files().list(q="'1bBWxuYTZbMg5UFK8La5-cUrcScKM2lre' in parents",
+            pageSize=100, pageToken=token, fields="nextPageToken, files(id, name)").execute()
+        token = results.get('nextPageToken')
+        items.extend(results.get('files', []))
+        print (token)
+        if not token:
+            break
 #    M&G
 #    results = service.files().list(q="'1MQO1Z0i-txOmbteB-VNyw9C4xs2xON5m' in parents",
 #        pageSize=1000, fields="nextPageToken, files(id, name)").execute()
 #    Green Monkey
-    results = service.files().list(q="'1XsjAv-Tqx_B6xIHKai8_yVmcwKla6yCl' in parents",
-        pageSize=1000, fields="nextPageToken, files(id, name)").execute()
+#    results = service.files().list(q="'1XsjAv-Tqx_B6xIHKai8_yVmcwKla6yCl' in parents",
+#        pageSize=1000, fields="nextPageToken, files(id, name)").execute()
 
-    token = results.get('nextPageToken')
-    items = results.get('files', [])
-
+#    items = results.get('files', [])
     # Crear Diccionario Facturas fileId : Name
     factura_dic = {}
     if not items:
@@ -111,7 +117,7 @@ def Parse_facturas():
                 interes = re.findall(r'<cbc:PriceAmount currencyID="COP">(\d+\.\d+)<\/cbc:PriceAmount>', factura_parse)
             else:
                 interes = ['0' , '0']
-            dic_nombre_facturas.update({Factura_id[0] : [Tienda[0], Credito[0], IssueDate[1]]})
+            dic_nombre_facturas.update({Factura_id[0] : [Tienda[0], Credito[0], Issue_Date[1]]})
             subtotal = round((float(Valor_total[0]) - float(iva[0]))/0.63 , 2)
             descuento = round(subtotal * 0.37 , 2)
             fact_proc.append([Factura_id[0],Tienda[0],Issue_Date[1], str(subtotal), str(descuento), iva[0], Valor_total[0], interes[1], Credito[0]])
@@ -123,7 +129,7 @@ def rename_files(dic_nombre_facturas):
     for k,v in dic_nombre_facturas.items():
         for f in files:
             if str(k) in f:
-                os.rename(path + "/" + f , path + "/" + str(dic_nombre_facturas[k][2]) + "_" + str(dic_nombre_facturas[k][0]) + "_" + str(dic_nombre_facturas[k][1]) + "_" + f)
+                os.rename(path + "/" + f , path + "/" + str(dic_nombre_facturas[k][0]) + "_" + str(dic_nombre_facturas[k][1]) + "_" + str(dic_nombre_facturas[k][2]) + "_" + f)
 
 
 def Reporte(fact_proc):
