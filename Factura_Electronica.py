@@ -14,6 +14,7 @@ from openpyxl.styles import PatternFill, Font, Border, Side
 from openpyxl.styles.colors import WHITE
 import datetime
 import os
+from zipfile import ZipFile
 
 # If modifying these scopes, delete the file token.pickle.
 SCOPES = ['https://www.googleapis.com/auth/drive']
@@ -75,13 +76,14 @@ def main():
 
 def download_file(service, factura_dic):
     for file_id, name in factura_dic.items():
-        request = service.files().get_media(fileId=file_id)
-        fh = io.FileIO("/Users/mpatinob/Dropbox/Personal/Negocios/Lili Pink/Facturas_Electronica/Facturas_download/" + name, 'wb')
-        downloader = MediaIoBaseDownload(fh, request)
-        done = False
-        while done is False:
-            status, done = downloader.next_chunk()
-            print ("Download %d%%." % int(status.progress() * 100))
+        if ";" not in name:
+            request = service.files().get_media(fileId=file_id)
+            fh = io.FileIO("/Users/mpatinob/Dropbox/Personal/Negocios/Lili Pink/Facturas_Electronica/Facturas_download/" + name, 'wb')
+            downloader = MediaIoBaseDownload(fh, request)
+            done = False
+            while done is False:
+                status, done = downloader.next_chunk()
+                print ("Download %d%%." % int(status.progress() * 100))
 
 def Parse_facturas():
     dic_nombre_facturas = {}
@@ -89,6 +91,13 @@ def Parse_facturas():
     path = '/Users/mpatinob/Dropbox/Personal/Negocios/Lili Pink/Facturas_Electronica/Facturas_download'
     files = [f for f in listdir(path) if isfile(join(path, f))]
     for f in files:
+        if '.zip' in f:
+            zf = ZipFile(path + "/" + f, 'r')
+            zf.extractall(path)
+            zf.close()
+
+    files1 = [f for f in listdir(path) if isfile(join(path, f))]
+    for f in files1:
         subtotal = 0
         descuento = 0
         if '.xml' in f:
@@ -117,10 +126,11 @@ def Parse_facturas():
                 interes = re.findall(r'<cbc:PriceAmount currencyID="COP">(\d+\.\d+)<\/cbc:PriceAmount>', factura_parse)
             else:
                 interes = ['0' , '0']
-            dic_nombre_facturas.update({Factura_id[0] : [Tienda[0], Credito[0], Issue_Date[1]]})
+            dic_nombre_facturas.update({Factura_id[0] : [Tienda[0], Credito[0], Issue_Date[1], f]})
             subtotal = round((float(Valor_total[0]) - float(iva[0]))/0.63 , 2)
             descuento = round(subtotal * 0.37 , 2)
             fact_proc.append([Factura_id[0],Tienda[0],Issue_Date[1], str(subtotal), str(descuento), iva[0], Valor_total[0], interes[1], Credito[0]])
+    print (dic_nombre_facturas)
     return fact_proc, dic_nombre_facturas
 
 def rename_files(dic_nombre_facturas):
@@ -128,9 +138,20 @@ def rename_files(dic_nombre_facturas):
     files = [f for f in listdir(path) if isfile(join(path, f))]
     for k,v in dic_nombre_facturas.items():
         for f in files:
-            if str(k) in f:
-                os.rename(path + "/" + f , path + "/" + str(dic_nombre_facturas[k][0]) + "_" + str(dic_nombre_facturas[k][1]) + "_" + str(dic_nombre_facturas[k][2]) + "_" + f)
+            if '.xml' in f:
+                if f.startswith('ad') is False:
+                    if dic_nombre_facturas[k][3] == f:
+                        os.rename(path + "/" + f , path + "/" + str(dic_nombre_facturas[k][0]) + "_" + str(dic_nombre_facturas[k][1]) + "_" + str(dic_nombre_facturas[k][2]) + "_" + f)
+                        f1 = f.replace('.xml', '.pdf')
+                        f2 = f1.replace('AttachedDocument_','')
+                        os.rename(path + "/" + f2 , path + "/" + str(dic_nombre_facturas[k][0]) + "_" + str(dic_nombre_facturas[k][1]) + "_" + str(dic_nombre_facturas[k][2]) + "_" + f2)
 
+                elif f.startswith('ad') is True:
+                    if dic_nombre_facturas[k][3] == f:
+                        os.rename(path + "/" + f , path + "/" + str(dic_nombre_facturas[k][0]) + "_" + str(dic_nombre_facturas[k][1]) + "_" + str(dic_nombre_facturas[k][2]) + "_" + f)
+                        f3 = f.replace('ad','fv')
+                        f4 = f3.replace('.xml','.pdf')
+                        os.rename(path + "/" + f4 , path + "/" + str(dic_nombre_facturas[k][0]) + "_" + str(dic_nombre_facturas[k][1]) + "_" + str(dic_nombre_facturas[k][2]) + "_" + f4)
 
 def Reporte(fact_proc):
     excel_salida = openpyxl.Workbook()
