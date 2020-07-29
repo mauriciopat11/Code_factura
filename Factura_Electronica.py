@@ -95,6 +95,13 @@ def Parse_facturas():
             zf = ZipFile(path + "/" + f, 'r')
             zf.extractall(path)
             zf.close()
+    files1 = [f for f in listdir(path) if isfile(join(path, f))]
+    for f in files1:
+        if f.startswith('nc') is True:
+            f1 = f.replace('nc','fv')
+            os.rename(path + "/" + f , path + "/" + f1)
+
+
 
     files1 = [f for f in listdir(path) if isfile(join(path, f))]
     for f in files1:
